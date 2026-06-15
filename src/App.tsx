@@ -11,7 +11,9 @@ import {
   UserPlus, 
   ShieldAlert, 
   CheckCircle,
-  Stethoscope
+  Stethoscope,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { User as UserType, Prediction } from './types';
 import SymptomInput from './components/SymptomInput';
@@ -44,6 +46,8 @@ export default function App() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [isAdminRole, setIsAdminRole] = useState(false);
 
   // General Notification messages
@@ -406,14 +410,30 @@ export default function App() {
                       <Lock className="w-3.5 h-3.5 text-slate-400" />
                       <span>Workspace Password</span>
                     </label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:outline-none transition-all text-slate-700 bg-slate-50/50 focus:bg-white shadow-inner focus:ring-0"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
+                    <div className="relative">
+                      <input
+                        id="login-password-input"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••"
+                        className="w-full pl-4 pr-12 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:outline-none transition-all text-slate-700 bg-slate-50/50 focus:bg-white shadow-inner focus:ring-0"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <button
+                        id="login-toggle-password-btn"
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-blue-600 focus:outline-none transition-colors select-none cursor-pointer"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                     <span className="text-[10px] text-slate-400 italic block mt-1.5 leading-normal">Default administrator profile credentials: admin@symptomsage.com / admin123</span>
                   </div>
 
@@ -461,14 +481,30 @@ export default function App() {
                       <Lock className="w-3.5 h-3.5 text-slate-400" />
                       <span>Compile Secret Password</span>
                     </label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="Minimum 6 characters"
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:outline-none transition-all text-slate-700 bg-slate-50/50 focus:bg-white shadow-inner focus:ring-0"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
+                    <div className="relative">
+                      <input
+                        id="register-password-input"
+                        type={showRegisterPassword ? "text" : "password"}
+                        required
+                        placeholder="Minimum 6 characters"
+                        className="w-full pl-4 pr-12 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:outline-none transition-all text-slate-700 bg-slate-50/50 focus:bg-white shadow-inner focus:ring-0"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <button
+                        id="register-toggle-password-btn"
+                        type="button"
+                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-blue-600 focus:outline-none transition-colors select-none cursor-pointer"
+                        aria-label={showRegisterPassword ? "Hide password" : "Show password"}
+                      >
+                        {showRegisterPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2.5 py-1 select-none">
@@ -497,9 +533,9 @@ export default function App() {
               {/* Mode toggle */}
               <div className="flex justify-between items-center text-xs font-bold font-sans border-t-2 border-slate-100 pt-5 text-slate-550">
                 {authMode === 'login' ? (
-                  <span>New patient? <button onClick={() => setAuthMode('register')} className="text-blue-650 hover:underline cursor-pointer font-extrabold uppercase tracking-wide">Compile Profile</button></span>
+                  <span>New patient? <button onClick={() => { setAuthMode('register'); setPassword(''); setShowPassword(false); setShowRegisterPassword(false); }} className="text-blue-650 hover:underline cursor-pointer font-extrabold uppercase tracking-wide">Compile Profile</button></span>
                 ) : (
-                  <span>Registered? <button onClick={() => setAuthMode('login')} className="text-blue-650 hover:underline cursor-pointer font-extrabold uppercase tracking-wide font-black">Login</button></span>
+                  <span>Registered? <button onClick={() => { setAuthMode('login'); setPassword(''); setShowPassword(false); setShowRegisterPassword(false); }} className="text-blue-650 hover:underline cursor-pointer font-extrabold uppercase tracking-wide font-black">Login</button></span>
                 )}
 
                 {/* sandbox shortcut bypass block for uneducated / quick testing */}

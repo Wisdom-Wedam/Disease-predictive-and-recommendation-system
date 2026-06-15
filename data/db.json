@@ -1,0 +1,169 @@
+{
+  "users": [
+    {
+      "id": "u_admin",
+      "fullName": "System Administrator",
+      "email": "admin@symptomsage.com",
+      "role": "admin",
+      "createdAt": "2026-06-15T13:41:50.370Z",
+      "passwordHash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"
+    }
+  ],
+  "diseases": [
+    {
+      "id": "d1",
+      "name": "Malaria",
+      "description": "A life-threatening disease caused by parasites transmitted to people through the bites of infected female Anopheles mosquitoes.",
+      "symptoms": [
+        "fever",
+        "headache",
+        "chills",
+        "sweating",
+        "muscle_ache",
+        "nausea",
+        "fatigue"
+      ]
+    },
+    {
+      "id": "d2",
+      "name": "Typhoid Fever",
+      "description": "A bacterial infection caused by Salmonella typhi, usually spread through contaminated food or water.",
+      "symptoms": [
+        "fever",
+        "fatigue",
+        "headache",
+        "nausea",
+        "stomach_pain",
+        "cough",
+        "diarrhea"
+      ]
+    },
+    {
+      "id": "d3",
+      "name": "Common Cold",
+      "description": "A viral infection of your nose and throat (upper respiratory tract). It's usually harmless.",
+      "symptoms": [
+        "runny_nose",
+        "sneezing",
+        "sore_throat",
+        "cough",
+        "congestion",
+        "muscle_ache"
+      ]
+    },
+    {
+      "id": "d4",
+      "name": "Influenza (Flu)",
+      "description": "A common viral infection that can be deadly, especially in high-risk groups, affecting lungs, nose, and throat.",
+      "symptoms": [
+        "fever",
+        "muscle_ache",
+        "chills",
+        "fatigue",
+        "headache",
+        "cough",
+        "sore_throat",
+        "runny_nose"
+      ]
+    },
+    {
+      "id": "d5",
+      "name": "Food Poisoning",
+      "description": "Illness caused by food contaminated with bacteria, viruses, parasites, or toxins.",
+      "symptoms": [
+        "stomach_pain",
+        "nausea",
+        "vomiting",
+        "diarrhea",
+        "fever",
+        "fatigue",
+        "headache"
+      ]
+    },
+    {
+      "id": "d6",
+      "name": "COVID-19",
+      "description": "An infectious respiratory illness caused by the SARS-CoV-2 virus, with highly variable symptoms.",
+      "symptoms": [
+        "cough",
+        "shortness_of_breath",
+        "fever",
+        "chills",
+        "muscle_ache",
+        "headache",
+        "sore_throat",
+        "loss_taste_smell",
+        "fatigue"
+      ]
+    },
+    {
+      "id": "d7",
+      "name": "Pneumonia",
+      "description": "An infection that inflames the air sacs in one or both lungs, which may fill with fluid or pus.",
+      "symptoms": [
+        "cough",
+        "fever",
+        "sweating",
+        "chills",
+        "shortness_of_breath",
+        "chest_pain",
+        "fatigue"
+      ]
+    },
+    {
+      "id": "d8",
+      "name": "Urinary Tract Infection (UTI)",
+      "description": "An infection in any part of the urinary system, including kidneys, bladder, or urethra.",
+      "symptoms": [
+        "chest_pain",
+        "burning_urination",
+        "frequent_urination",
+        "back_pain"
+      ]
+    },
+    {
+      "id": "d9",
+      "name": "Migraine",
+      "description": "A neurological condition that can cause multiple symptoms, preeminently intense throbbing headaches.",
+      "symptoms": [
+        "headache",
+        "nausea",
+        "dizziness"
+      ]
+    },
+    {
+      "id": "d10",
+      "name": "Dehydration",
+      "description": "A harmful reduction in the amount of water in the body, caused by losing more fluid than you take in.",
+      "symptoms": [
+        "fatigue",
+        "dizziness",
+        "stomach_pain"
+      ]
+    },
+    {
+      "id": "d11",
+      "name": "Gastroenteritis",
+      "description": "An intestinal infection marked by watery diarrhea, abdominal cramps, nausea or vomiting, and sometimes fever.",
+      "symptoms": [
+        "diarrhea",
+        "stomach_pain",
+        "nausea",
+        "vomiting",
+        "fever"
+      ]
+    },
+    {
+      "id": "d12",
+      "name": "Asthma",
+      "description": "A condition in which your airways narrow and swell and may produce extra mucus, making breathing difficult.",
+      "symptoms": [
+        "shortness_of_breath",
+        "chest_pain",
+        "wheezing",
+        "cough"
+      ]
+    }
+  ],
+  "predictions": []
+}
