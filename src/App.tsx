@@ -7,7 +7,11 @@ import AdminPanel from './components/AdminPanel';
 import { User, Prediction } from './types';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('symptomsage_session');
+    return saved ? JSON.parse(saved) : null;
+  });
+  
   const [isLoading, setIsLoading] = useState(false);
   const [activeView, setActiveView] = useState<'input' | 'result' | 'history' | 'admin'>('input');
   const [predictions, setPredictions] = useState<any[]>([]);
@@ -58,7 +62,9 @@ export default function App() {
       if (!res.ok) throw new Error(data.error);
 
       setUser(data.user);
+      localStorage.setItem('symptomsage_session', JSON.stringify(data.user));
       form.reset();
+      setActiveView('input');
       showAlert('success', 'Registration successful! Welcome aboard.');
     } catch (err: any) {
       showAlert('resError', err.message);
@@ -88,6 +94,7 @@ export default function App() {
       if (!res.ok) throw new Error(data.error);
 
       setUser(data.user);
+      localStorage.setItem('symptomsage_session', JSON.stringify(data.user));
       form.reset();
       setActiveView('input');
       showAlert('success', `Welcome back, ${data.user.fullName}!`);
@@ -98,7 +105,7 @@ export default function App() {
     }
   };
 
-  // Skip Login / Guest Sandbox session bypass (for extreme user simplicity & accessibility)
+  // Skip Login / Guest Sandbox session bypass
   const handleGuestSession = () => {
     const guestUser: User = {
       id: `guest_${Date.now()}`,
@@ -115,6 +122,7 @@ export default function App() {
   // Logout session clear
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('symptomsage_session');
     setPredictions([]);
     setDetectedSymptoms([]);
     setOriginalText('');
@@ -125,7 +133,7 @@ export default function App() {
     showAlert('success', 'Logged out successfully.');
   };
 
-  // Symptom submission logic
+  // Symptom submission logic - CRITICAL FIX: Ensure state updates BEFORE view change
   const handleAnalyzeSymptoms = async (text: string, patientAge: number, patientGender: string) => {
     if (!text.trim()) return;
 
@@ -151,22 +159,23 @@ export default function App() {
         return;
       }
 
-      // Store the results
+      // IMPORTANT: Update all state values BEFORE changing view
       setDetectedSymptoms(data.symptoms);
       setOriginalText(text);
       setPredictions(data.predictions);
       setAge(patientAge);
       setGender(patientGender);
 
-      // Switch to result view AFTER state is updated
-      setActiveView('result');
+      // NOW switch to result view with setTimeout to ensure state is flushed
+      setTimeout(() => {
+        setActiveView('result');
+        showAlert('success', 'Analysis complete! View your results below.');
+      }, 0);
 
-      // Fetch updated history if user is logged in
+      // Fetch updated history if user is logged in (non-blocking)
       if (user) {
-        await fetchUserHistory();
+        fetchUserHistory().catch(err => console.error('History fetch error:', err));
       }
-
-      showAlert('success', 'Analysis complete! View your results below.');
     } catch (err: any) {
       showAlert('resError', err.message || 'Analysis failed. Please try again.');
     } finally {
