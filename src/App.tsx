@@ -1,565 +1,474 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Heart, 
-  Activity, 
-  User, 
-  Lock, 
-  Mail, 
-  Calendar, 
-  BarChart2, 
-  LogOut, 
-  UserPlus, 
-  ShieldAlert, 
-  CheckCircle,
-  Stethoscope,
-  Eye,
-  EyeOff
-} from 'lucide-react';
-import { User as UserType, Prediction } from './types';
+import { LogOut, Menu, X, History, LogIn } from 'lucide-react';
 import SymptomInput from './components/SymptomInput';
 import PredictionResult from './components/PredictionResult';
 import HistoryList from './components/HistoryList';
 import AdminPanel from './components/AdminPanel';
+import { User, Prediction } from './types';
 
 export default function App() {
-  // Global auth states
-  const [user, setUser] = useState<UserType | null>(() => {
-    const saved = localStorage.getItem('symptomsage_session');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [activeView, setActiveView] = useState<'home' | 'result' | 'history' | 'admin'>('home');
-
-  // Input & analysis state
-  const [inputText, setInputText] = useState('');
-  const [patientAge, setPatientAge] = useState<number | null>(null);
-  const [patientGender, setPatientGender] = useState<string | null>(null);
-  const [detectedSymptoms, setDetectedSymptoms] = useState<string[]>([]);
-  const [predictions, setPredictions] = useState<any[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // History state
-  const [historyLogs, setHistoryLogs] = useState<Prediction[]>([]);
-
-  // Form states
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
-  const [isAdminRole, setIsAdminRole] = useState(false);
-
-  // General Notification messages
-  const [alert, setAlert] = useState<{ type: 'success' | 'resError'; msg: string } | null>(null);
-
-  useEffect(() => {
-    // If logged in, fetch their session history
-    if (user && user.role === 'patient') {
-      fetchUserHistory();
-    }
-  }, [user]);
+  const [activeView, setActiveView] = useState<'input' | 'result' | 'history' | 'admin'>('input');
+  const [predictions, setPredictions] = useState<any[]>([]);
+  const [detectedSymptoms, setDetectedSymptoms] = useState<string[]>([]);
+  const [originalText, setOriginalText] = useState('');
+  const [userHistory, setUserHistory] = useState<Prediction[]>([]);
+  const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'resError'; msg: string } | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [age, setAge] = useState<number | undefined>();
+  const [gender, setGender] = useState<string | undefined>();
 
   const showAlert = (type: 'success' | 'resError', msg: string) => {
-    setAlert({ type, msg });
-    setTimeout(() => {
-      setAlert(null);
-    }, 4000);
+    setAlertMessage({ type, msg });
+    setTimeout(() => setAlertMessage(null), 4000);
   };
 
   const fetchUserHistory = async () => {
     if (!user) return;
     try {
       const res = await fetch(`/api/history?userId=${user.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setHistoryLogs(data);
-      }
+      const data = await res.json();
+      setUserHistory(data);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch history:', err);
     }
   };
 
   // Register Patient / Administrator account
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !email.trim() || !password.trim()) {
-      showAlert('resError', 'Please fill in all registration fields.');
-      return;
-    }
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
 
     try {
+      setIsLoading(true);
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fullName,
-          email,
-          password,
-          role: isAdminRole ? 'admin' : 'patient'
+          fullName: formData.get('fullName'),
+          email: formData.get('email'),
+          password: formData.get('password'),
+          role: 'patient'
         })
       });
 
       const data = await res.json();
-      if (res.ok) {
-        showAlert('success', 'Profile compiled successfully! Please log in.');
-        setAuthMode('login');
-        setPassword('');
-      } else {
-        showAlert('resError', data.error || 'Failed to register account');
-      }
-    } catch (err) {
-      showAlert('resError', 'Network error. Please try again.');
+      if (!res.ok) throw new Error(data.error);
+
+      setUser(data.user);
+      form.reset();
+      showAlert('success', 'Registration successful! Welcome aboard.');
+    } catch (err: any) {
+      showAlert('resError', err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Login transaction
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      showAlert('resError', 'Please enter your email and password.');
-      return;
-    }
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
 
     try {
+      setIsLoading(true);
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setUser(data.user);
-        localStorage.setItem('symptomsage_session', JSON.stringify(data.user));
-        showAlert('success', `Welcome back, ${data.user.fullName}!`);
-        
-        // Router allocation
-        if (data.user.role === 'admin') {
-          setActiveView('admin');
-        } else {
-          setActiveView('home');
-        }
-      } else {
-        showAlert('resError', data.error || 'Invalid credentials.');
-      }
-    } catch (err) {
-      showAlert('resError', 'Login server connection lost.');
-    }
-  };
-
-  // Skip Login / Guest Sandbox session bypass (for extreme user simplicity & accessibility)
-  const handleGuestSession = () => {
-    const guestUser: UserType = {
-      id: 'u_guest',
-      fullName: 'Anonymous Guest',
-      email: 'guest@symptomsage.local',
-      role: 'patient',
-      createdAt: new Date().toISOString()
-    };
-    setUser(guestUser);
-    localStorage.setItem('symptomsage_session', JSON.stringify(guestUser));
-    showAlert('success', 'Entered SymptomSage Sandbox under a Guest Profile.');
-    setActiveView('home');
-  };
-
-  // Logout session clear
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('symptomsage_session');
-    setPredictions([]);
-    setDetectedSymptoms([]);
-    setInputText('');
-    setHistoryLogs([]);
-    setActiveView('home');
-  };
-
-  // Symptom submission logic
-  const handleAnalyzeSymptoms = async (text: string, age: number, gender: string) => {
-    setIsLoading(true);
-    setInputText(text);
-    setPatientAge(age);
-    setPatientGender(gender);
-
-    try {
-      const res = await fetch('/api/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text,
-          userId: user ? user.id : 'u_guest',
-          age,
-          gender
+          email: formData.get('email'),
+          password: formData.get('password')
         })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setDetectedSymptoms(data.symptoms);
-        setPredictions(data.predictions);
-        
-        if (data.symptoms.length === 0) {
-          showAlert('resError', 'Our ML model was unable to extract any symptoms from your description. Try typing in some of the live example ways.');
-        } else {
-          setActiveView('result');
-          // Update patient history feed asynchronously if patient is signed in
-          if (user && user.role === 'patient') {
-            fetchUserHistory();
-          }
-        }
-      } else {
-        const err = await res.json();
-        showAlert('resError', err.error || 'Symptom predictive ensemble crashed.');
-      }
-    } catch (err) {
-      showAlert('resError', 'Diagnosis request failed to complete.');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setUser(data.user);
+      form.reset();
+      setActiveView('input');
+      showAlert('success', `Welcome back, ${data.user.fullName}!`);
+    } catch (err: any) {
+      showAlert('resError', err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col selection:bg-blue-100 selection:text-blue-800">
+  // Skip Login / Guest Sandbox session bypass (for extreme user simplicity & accessibility)
+  const handleGuestSession = () => {
+    const guestUser: User = {
+      id: `guest_${Date.now()}`,
+      fullName: 'Guest User',
+      email: 'guest@symptomsage.com',
+      role: 'patient',
+      createdAt: new Date().toISOString()
+    };
+    setUser(guestUser);
+    setActiveView('input');
+    showAlert('success', 'Welcome! You are in guest mode.');
+  };
+
+  // Logout session clear
+  const handleLogout = () => {
+    setUser(null);
+    setPredictions([]);
+    setDetectedSymptoms([]);
+    setOriginalText('');
+    setUserHistory([]);
+    setActiveView('input');
+    setAge(undefined);
+    setGender(undefined);
+    showAlert('success', 'Logged out successfully.');
+  };
+
+  // Symptom submission logic
+  const handleAnalyzeSymptoms = async (text: string, patientAge: number, patientGender: string) => {
+    if (!text.trim()) return;
+
+    try {
+      setIsLoading(true);
       
-      {/* GLOBAL TOAST NOTICE */}
-      {alert && (
-        <div id="general-alert" className={`fixed top-4 left-1/2 -translate-x-1/2 p-4 rounded-xl text-sm font-sans font-medium flex items-center gap-2.5 shadow-lg border z-50 animate-fade-in ${
-          alert.type === 'success' 
-            ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
-            : 'bg-red-50 border-red-100 text-red-800'
-        }`}>
-          {alert.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-600" /> : <ShieldAlert className="w-5 h-5 text-red-600" />}
-          <span>{alert.msg}</span>
+      const res = await fetch('/api/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          userId: user?.id || null,
+          age: patientAge,
+          gender: patientGender
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      if (data.predictions.length === 0) {
+        showAlert('resError', 'Could not identify any recognized symptoms. Please describe your symptoms more clearly.');
+        return;
+      }
+
+      // Store the results
+      setDetectedSymptoms(data.symptoms);
+      setOriginalText(text);
+      setPredictions(data.predictions);
+      setAge(patientAge);
+      setGender(patientGender);
+
+      // Switch to result view AFTER state is updated
+      setActiveView('result');
+
+      // Fetch updated history if user is logged in
+      if (user) {
+        await fetchUserHistory();
+      }
+
+      showAlert('success', 'Analysis complete! View your results below.');
+    } catch (err: any) {
+      showAlert('resError', err.message || 'Analysis failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Reset to input view
+  const handleResetToInput = () => {
+    setActiveView('input');
+    setPredictions([]);
+    setDetectedSymptoms([]);
+    setOriginalText('');
+    setAge(undefined);
+    setGender(undefined);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 text-slate-900">
+      {/* Alert notifications */}
+      {alertMessage && (
+        <div
+          className={`fixed top-6 right-6 px-6 py-4 rounded-2xl font-bold text-sm shadow-lg z-50 border-2 animate-fade-in ${
+            alertMessage.type === 'success'
+              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+              : 'bg-red-100 text-red-800 border-red-200'
+          }`}
+        >
+          {alertMessage.msg}
         </div>
       )}
 
-      {/* CORE NAVIGATION BAR */}
-      <header className="bg-white border-b-2 border-slate-100 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex justify-between items-center">
-          
-          {/* Logo Brand branding */}
-          <div 
-            onClick={() => user?.role === 'admin' ? setActiveView('admin') : setActiveView('home')} 
-            className="flex items-center gap-3 cursor-pointer selection:bg-transparent"
-          >
-            <div className="w-10 h-10 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/15 flex items-center justify-center font-black text-xl">
+      {/* Navigation header */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-slate-200/50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-lg">
               S
             </div>
-            <div>
-              <span className="font-display font-black text-2xl text-blue-900 tracking-tight block leading-none">SymptomSage</span>
-              <span className="text-[10px] font-mono tracking-[0.2em] font-extrabold uppercase text-blue-650 block mt-1">ML Health Advisor</span>
-            </div>
+            <h1 className="font-display font-black text-2xl text-slate-900 hidden sm:block">SymptomSage</h1>
           </div>
 
-          {/* Nav items */}
           {user && (
-            <div className="flex items-center gap-6">
-              <nav className="hidden md:flex items-center gap-8 text-sm font-display font-bold uppercase tracking-widest text-slate-400">
-                {user.role === 'patient' && (
-                  <>
-                    <button 
-                      onClick={() => setActiveView('home')} 
-                      className={`hover:text-slate-800 transition-colors cursor-pointer border-b-2 pb-1 ${activeView === 'home' || activeView === 'result' ? 'text-blue-600 border-blue-600' : 'border-transparent'}`}
-                    >
-                      New Checkup
-                    </button>
-                    <button 
-                      onClick={() => setActiveView('history')} 
-                      className={`hover:text-slate-800 transition-colors cursor-pointer border-b-2 pb-1 ${activeView === 'history' ? 'text-blue-600 border-blue-600' : 'border-transparent'}`}
-                    >
-                      My History
-                    </button>
-                  </>
-                )}
-                {user.role === 'admin' && (
-                  <button 
-                    onClick={() => setActiveView('admin')} 
-                    className={`hover:text-slate-800 transition-colors cursor-pointer border-b-2 pb-1 ${activeView === 'admin' ? 'text-blue-600 border-blue-600' : 'border-transparent'}`}
-                  >
-                    Admin Portal
-                  </button>
-                )}
-              </nav>
-
-              {/* Profile button card */}
-              <div className="flex items-center gap-3 bg-slate-50 p-2 pl-4 pr-2 border-2 border-slate-100 rounded-2xl">
-                <div className="text-right">
-                  <p className="text-[9px] font-black text-slate-400 tracking-widest uppercase">WELCOME BACK</p>
-                  <p className="text-xs font-black text-slate-800">{user.fullName}</p>
-                </div>
+            <div className="hidden md:flex items-center gap-4">
+              <button
+                onClick={() => setActiveView('input')}
+                className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+                  activeView === 'input'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                New Check
+              </button>
+              <button
+                onClick={() => {
+                  setActiveView('history');
+                  fetchUserHistory();
+                }}
+                className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${
+                  activeView === 'history'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <History className="w-4 h-4" />
+                History
+              </button>
+              {user.role === 'admin' && (
                 <button
-                  onClick={handleLogout}
-                  className="p-1.5 hover:bg-slate-200/50 text-slate-450 hover:text-slate-700 rounded-xl transition-all cursor-pointer"
-                  title="Sign out of panel"
+                  onClick={() => setActiveView('admin')}
+                  className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+                    activeView === 'admin'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
                 >
-                  <LogOut className="w-4 h-4" />
+                  Admin
                 </button>
-              </div>
+              )}
             </div>
           )}
+
+          {user ? (
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:block text-right">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Logged In</p>
+                <p className="font-display font-black text-slate-900">{user.fullName}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2.5 hover:bg-red-50 text-red-600 rounded-xl transition-colors border border-red-200"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="md:hidden p-2.5 hover:bg-slate-100 rounded-xl"
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setActiveView('input')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-all"
+            >
+              <LogIn className="w-4 h-4" />
+              <span className="hidden sm:inline">Get Started</span>
+            </button>
+          )}
         </div>
-      </header>
 
-      {/* MOBILE LOWER NAV BAR */}
-      {user && user.role === 'patient' && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t-2 border-slate-100 flex py-3.5 z-40 shadow-xl justify-around text-[10px] font-black uppercase tracking-widest text-slate-400">
-          <button 
-            onClick={() => setActiveView('home')}
-            className={`flex flex-col items-center gap-1 cursor-pointer transition-colors ${activeView === 'home' || activeView === 'result' ? 'text-blue-600' : ''}`}
-          >
-            <Activity className="w-5 h-5" />
-            <span>Analyzer</span>
-          </button>
-          <button 
-            onClick={() => setActiveView('history')}
-            className={`flex flex-col items-center gap-1 cursor-pointer transition-colors ${activeView === 'history' ? 'text-blue-600' : ''}`}
-          >
-            <Calendar className="w-5 h-5" />
-            <span>History</span>
-          </button>
-          <button 
-            onClick={handleLogout}
-            className="flex flex-col items-center gap-1 cursor-pointer text-slate-450 hover:text-slate-700"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>Logout</span>
-          </button>
-        </div>
-      )}
-
-      {/* MAIN CONTAINER CONTENT VIEWPORT */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-24 md:py-14">
-        {user ? (
-          /* ================= VIEW 1: AUTHENTICATED PANEL WORKSPACES ================= */
-          <div className="space-y-8">
-            {activeView === 'home' && (
-              <div className="space-y-8 max-w-4xl mx-auto text-center">
-                <div className="space-y-4 pb-4">
-                  <h1 className="font-display font-black text-4xl md:text-6xl text-slate-900 tracking-tight leading-tight">
-                    How are you <span className="text-blue-600">feeling</span> today?
-                  </h1>
-                  <p className="text-slate-500 font-sans font-semibold text-base max-w-xl mx-auto leading-relaxed">
-                    Describe your symptoms in your own plain words. Our AI analyzes your inputs to identify clinical matching patterns instantly.
-                  </p>
-                </div>
-                
-                <SymptomInput 
-                  onAnalyze={handleAnalyzeSymptoms} 
-                  isLoading={isLoading} 
-                />
-              </div>
-            )}
-
-            {activeView === 'result' && (
-              <div className="max-w-4xl mx-auto">
-                <PredictionResult
-                  originalText={inputText}
-                  detectedSymptoms={detectedSymptoms}
-                  predictions={predictions}
-                  onReset={() => setActiveView('home')}
-                  age={patientAge || undefined}
-                  gender={patientGender || undefined}
-                />
-              </div>
-            )}
-
-            {activeView === 'history' && (
-              <div className="max-w-4xl mx-auto">
-                <HistoryList history={historyLogs} />
-              </div>
-            )}
-
-            {activeView === 'admin' && user.role === 'admin' && (
-              <AdminPanel onLogoutAdmin={handleLogout} />
+        {/* Mobile menu */}
+        {mobileMenuOpen && user && (
+          <div className="md:hidden border-t border-slate-200 bg-slate-50 p-4 space-y-2">
+            <button
+              onClick={() => {
+                setActiveView('input');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full text-left px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+                activeView === 'input'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              New Check
+            </button>
+            <button
+              onClick={() => {
+                setActiveView('history');
+                fetchUserHistory();
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full text-left px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${
+                activeView === 'history'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              History
+            </button>
+            {user.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setActiveView('admin');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full text-left px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+                  activeView === 'admin'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Admin
+              </button>
             )}
           </div>
-        ) : (
-          /* ================= VIEW 2: PUBLIC GUEST LOGIN & REGS SCREENS ================= */
-          <div className="max-w-md mx-auto bg-white rounded-3xl border-2 border-slate-150 shadow-2xl overflow-hidden p-8 md:p-10 animate-fade-in my-6">
-            <div className="space-y-6 text-center">
-              <div className="space-y-3">
-                <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-sm border-2 border-blue-100/50">
-                  <Stethoscope className="w-7 h-7 animate-pulse" />
-                </div>
-                <h2 className="font-display font-black text-3xl text-slate-900 tracking-tight">Welcome to SymptomSage</h2>
-                <p className="text-slate-500 text-sm max-w-xs mx-auto font-medium leading-relaxed">
-                  Join our intelligent medical workspace to analyze symptoms, read health recommendations, and save histories.
-                </p>
+        )}
+      </header>
+
+      {/* Main content */}
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+        {!user ? (
+          <div id="auth-container" className="max-w-2xl mx-auto space-y-8">
+            {/* Login Tab */}
+            <div className="bg-white rounded-3xl border-2 border-slate-150 shadow-lg overflow-hidden">
+              <div className="bg-blue-600 text-white p-8 text-center">
+                <h2 className="font-display font-black text-3xl mb-2">Welcome to SymptomSage</h2>
+                <p className="text-blue-50 font-semibold">AI-powered symptom analysis & health recommendations</p>
               </div>
 
-              {/* Input Forms */}
-              {authMode === 'login' ? (
-                <form onSubmit={handleLogin} className="space-y-4 text-left">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Email Connection</span>
+              <div className="p-8 space-y-6">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+                      Email Address
                     </label>
                     <input
                       type="email"
+                      name="email"
+                      placeholder="your@email.com"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl font-semibold focus:outline-none focus:border-blue-500"
+                      disabled={isLoading}
                       required
-                      placeholder="e.g., patient@example.com"
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:outline-none transition-all text-slate-700 bg-slate-50/50 focus:bg-white shadow-inner focus:ring-0"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
                     />
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Workspace Password</span>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+                      Password
                     </label>
-                    <div className="relative">
-                      <input
-                        id="login-password-input"
-                        type={showPassword ? "text" : "password"}
-                        required
-                        placeholder="••••••••"
-                        className="w-full pl-4 pr-12 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:outline-none transition-all text-slate-700 bg-slate-50/50 focus:bg-white shadow-inner focus:ring-0"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                      <button
-                        id="login-toggle-password-btn"
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-blue-600 focus:outline-none transition-colors select-none cursor-pointer"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                    <span className="text-[10px] text-slate-400 italic block mt-1.5 leading-normal">Default administrator profile credentials: admin@symptomsage.com / admin123</span>
+                    <input
+                      type="password"
+                      name="password"
+                      placeholder="••••••••"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl font-semibold focus:outline-none focus:border-blue-500"
+                      disabled={isLoading}
+                      required
+                    />
                   </div>
-
                   <button
                     type="submit"
-                    className="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 text-white font-display font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                    disabled={isLoading}
+                    className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Enter Workspace
+                    {isLoading ? 'Signing In...' : 'Sign In'}
                   </button>
                 </form>
-              ) : (
-                <form onSubmit={handleRegister} className="space-y-4 text-left">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Full Legal Name</span>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-slate-200"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-slate-500 font-bold">OR</span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleRegister} className="space-y-4 pt-4 border-t-2 border-slate-150">
+                  <h3 className="font-display font-black text-lg text-slate-900">Create New Account</h3>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+                      Full Name
                     </label>
                     <input
                       type="text"
+                      name="fullName"
+                      placeholder="John Doe"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl font-semibold focus:outline-none focus:border-blue-500"
+                      disabled={isLoading}
                       required
-                      placeholder="e.g., Wisdom Alagiteh"
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:outline-none transition-all text-slate-700 bg-slate-50/50 focus:bg-white shadow-inner focus:ring-0"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
                     />
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Email Connection</span>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+                      Email Address
                     </label>
                     <input
                       type="email"
+                      name="email"
+                      placeholder="your@email.com"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl font-semibold focus:outline-none focus:border-blue-500"
+                      disabled={isLoading}
                       required
-                      placeholder="e.g. wisdom@example.com"
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:outline-none transition-all text-slate-700 bg-slate-50/50 focus:bg-white shadow-inner focus:ring-0"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
                     />
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Compile Secret Password</span>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+                      Password
                     </label>
-                    <div className="relative">
-                      <input
-                        id="register-password-input"
-                        type={showRegisterPassword ? "text" : "password"}
-                        required
-                        placeholder="Minimum 6 characters"
-                        className="w-full pl-4 pr-12 py-3 border-2 border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:outline-none transition-all text-slate-700 bg-slate-50/50 focus:bg-white shadow-inner focus:ring-0"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                      <button
-                        id="register-toggle-password-btn"
-                        type="button"
-                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-blue-600 focus:outline-none transition-colors select-none cursor-pointer"
-                        aria-label={showRegisterPassword ? "Hide password" : "Show password"}
-                      >
-                        {showRegisterPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 py-1 select-none">
-                    <input 
-                      type="checkbox"
-                      id="isAdminRoleCheck"
-                      className="w-4 h-4 text-blue-600 border-2 border-slate-300 focus:ring-0 cursor-pointer rounded-md"
-                      checked={isAdminRole}
-                      onChange={(e) => setIsAdminRole(e.target.checked)}
+                    <input
+                      type="password"
+                      name="password"
+                      placeholder="••••••••"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl font-semibold focus:outline-none focus:border-blue-500"
+                      disabled={isLoading}
+                      required
                     />
-                    <label htmlFor="isAdminRoleCheck" className="text-xs font-bold text-slate-600 cursor-pointer uppercase tracking-wide">
-                      Register as Administrator
-                    </label>
                   </div>
-
                   <button
                     type="submit"
-                    className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-display font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center justify-center gap-2"
+                    disabled={isLoading}
+                    className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <UserPlus className="w-4 h-4" />
-                    <span>Compile Account Profile</span>
+                    {isLoading ? 'Creating Account...' : 'Create Account'}
                   </button>
                 </form>
-              )}
 
-              {/* Mode toggle */}
-              <div className="flex justify-between items-center text-xs font-bold font-sans border-t-2 border-slate-100 pt-5 text-slate-550">
-                {authMode === 'login' ? (
-                  <span>New patient? <button onClick={() => { setAuthMode('register'); setPassword(''); setShowPassword(false); setShowRegisterPassword(false); }} className="text-blue-650 hover:underline cursor-pointer font-extrabold uppercase tracking-wide">Compile Profile</button></span>
-                ) : (
-                  <span>Registered? <button onClick={() => { setAuthMode('login'); setPassword(''); setShowPassword(false); setShowRegisterPassword(false); }} className="text-blue-650 hover:underline cursor-pointer font-extrabold uppercase tracking-wide font-black">Login</button></span>
-                )}
-
-                {/* sandbox shortcut bypass block for uneducated / quick testing */}
-                <button 
-                  onClick={handleGuestSession} 
-                  className="text-emerald-600 hover:underline font-black flex items-center gap-1 cursor-pointer uppercase tracking-wide text-[11px]"
-                  title="Directly bypass authentication gates"
+                <button
+                  onClick={handleGuestSession}
+                  className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-150 text-slate-700 rounded-xl font-bold uppercase tracking-widest transition-all border-2 border-slate-200"
                 >
-                  <span>Quick Test guest</span>
-                  <span>&rarr;</span>
+                  Continue as Guest
                 </button>
               </div>
             </div>
           </div>
+        ) : activeView === 'result' && predictions.length > 0 ? (
+          <div className="max-w-6xl mx-auto">
+            <PredictionResult
+              originalText={originalText}
+              detectedSymptoms={detectedSymptoms}
+              predictions={predictions}
+              onReset={handleResetToInput}
+              age={age}
+              gender={gender}
+            />
+          </div>
+        ) : activeView === 'history' ? (
+          <div className="max-w-6xl mx-auto">
+            <HistoryList history={userHistory} />
+          </div>
+        ) : activeView === 'admin' ? (
+          <AdminPanel onLogoutAdmin={handleLogout} />
+        ) : (
+          <div className="max-w-4xl mx-auto">
+            <SymptomInput onAnalyze={handleAnalyzeSymptoms} isLoading={isLoading} />
+          </div>
         )}
       </main>
-
-      {/* FOOTER */}
-      <footer className="bg-white border-t-2 border-slate-100 py-6 text-center text-[10px] font-bold tracking-widest uppercase text-slate-500 select-none">
-        <div className="max-w-7xl mx-auto px-4 space-y-1">
-          <p>© 2026 SymptomSage Machine Learning Diagnostics. Styled with Bold Typography aesthetic.</p>
-          <p className="text-slate-350">Disclaimer: SymptomSage provides machine learning estimates for educational purposes, not authoritative medical decisions.</p>
-        </div>
-      </footer>
     </div>
   );
 }
