@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LogOut, Menu, X, History, LogIn } from 'lucide-react';
 import SymptomInput from './components/SymptomInput';
 import PredictionResult from './components/PredictionResult';
@@ -24,6 +24,9 @@ export default function App() {
   const [gender, setGender] = useState<string | undefined>();
   // FIX: Add explicit flag to track result readiness
   const [isResultReady, setIsResultReady] = useState(false);
+  
+  // Track if we've already shown the success alert for current prediction
+  const hasShownSuccessAlert = useRef(false);
 
   const showAlert = (type: 'success' | 'resError', msg: string) => {
     setAlertMessage({ type, msg });
@@ -42,13 +45,22 @@ export default function App() {
   };
 
   // FIX: Use useEffect to handle view transition after state updates complete
+  // CRITICAL: Do NOT include showAlert in dependencies to prevent infinite loops
   useEffect(() => {
     // Only change view to result when we have valid predictions
-    if (isResultReady && predictions.length > 0 && detectedSymptoms.length > 0 && originalText.trim()) {
+    if (isResultReady && predictions.length > 0 && detectedSymptoms.length > 0 && originalText.trim().length > 0) {
+      console.log('[DEBUG] View transition triggered: predictions ready, switching to result view');
+      
+      // Only set activeView, don't call showAlert here (was causing loops)
       setActiveView('result');
-      showAlert('success', 'Analysis complete! View your results below.');
+      
+      // Show success message only once per prediction
+      if (!hasShownSuccessAlert.current) {
+        hasShownSuccessAlert.current = true;
+        showAlert('success', 'Analysis complete! View your results below.');
+      }
     }
-  }, [isResultReady, predictions, detectedSymptoms, originalText]);
+  }, [isResultReady, predictions.length, detectedSymptoms.length, originalText.length]);
 
   // Register Patient / Administrator account
   const handleRegister = async (e: React.FormEvent) => {
@@ -143,6 +155,7 @@ export default function App() {
     setGender(undefined);
     // FIX: Reset result ready flag on logout
     setIsResultReady(false);
+    hasShownSuccessAlert.current = false;
     showAlert('success', 'Logged out successfully.');
   };
 
@@ -152,8 +165,10 @@ export default function App() {
 
     try {
       setIsLoading(true);
-      // FIX: Reset result ready flag before new analysis
+      // FIX: Reset result ready flag and alert tracker before new analysis
       setIsResultReady(false);
+      hasShownSuccessAlert.current = false;
+      console.log('[DEBUG] New analysis started');
       
       const res = await fetch('/api/predict', {
         method: 'POST',
@@ -171,8 +186,16 @@ export default function App() {
 
       if (data.predictions.length === 0) {
         showAlert('resError', 'Could not identify any recognized symptoms. Please describe your symptoms more clearly.');
+        setIsResultReady(false);
+        hasShownSuccessAlert.current = false;
         return;
       }
+
+      console.log('[DEBUG] API response received:', {
+        symptomsCount: data.symptoms.length,
+        predictionsCount: data.predictions.length,
+        firstDisease: data.predictions[0]?.diseaseName
+      });
 
       // FIX: Update all state values together
       // React 18+ batches these updates together
@@ -184,6 +207,8 @@ export default function App() {
       
       // FIX: This flag will trigger useEffect which safely transitions to result view
       // This ensures all state updates are complete before we change the view
+      // Set this LAST so all state is ready
+      console.log('[DEBUG] Setting isResultReady to true');
       setIsResultReady(true);
 
       // Fetch updated history if user is logged in (non-blocking)
@@ -191,8 +216,10 @@ export default function App() {
         fetchUserHistory().catch(err => console.error('History fetch error:', err));
       }
     } catch (err: any) {
+      console.error('[DEBUG] Analysis failed:', err);
       // FIX: Reset ready flag on error
       setIsResultReady(false);
+      hasShownSuccessAlert.current = false;
       showAlert('resError', err.message || 'Analysis failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -201,6 +228,7 @@ export default function App() {
 
   // Reset to input view - FIX: Also reset the ready flag
   const handleResetToInput = () => {
+    console.log('[DEBUG] Resetting to input view');
     setActiveView('input');
     setPredictions([]);
     setDetectedSymptoms([]);
@@ -209,6 +237,7 @@ export default function App() {
     setGender(undefined);
     // FIX: Reset result ready flag
     setIsResultReady(false);
+    hasShownSuccessAlert.current = false;
   };
 
   return (
