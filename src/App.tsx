@@ -22,6 +22,8 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [age, setAge] = useState<number | undefined>();
   const [gender, setGender] = useState<string | undefined>();
+  // FIX: Add explicit flag to track result readiness
+  const [isResultReady, setIsResultReady] = useState(false);
 
   const showAlert = (type: 'success' | 'resError', msg: string) => {
     setAlertMessage({ type, msg });
@@ -38,6 +40,15 @@ export default function App() {
       console.error('Failed to fetch history:', err);
     }
   };
+
+  // FIX: Use useEffect to handle view transition after state updates complete
+  useEffect(() => {
+    // Only change view to result when we have valid predictions
+    if (isResultReady && predictions.length > 0 && detectedSymptoms.length > 0 && originalText.trim()) {
+      setActiveView('result');
+      showAlert('success', 'Analysis complete! View your results below.');
+    }
+  }, [isResultReady, predictions, detectedSymptoms, originalText]);
 
   // Register Patient / Administrator account
   const handleRegister = async (e: React.FormEvent) => {
@@ -130,15 +141,19 @@ export default function App() {
     setActiveView('input');
     setAge(undefined);
     setGender(undefined);
+    // FIX: Reset result ready flag on logout
+    setIsResultReady(false);
     showAlert('success', 'Logged out successfully.');
   };
 
-  // Symptom submission logic - CRITICAL FIX: Ensure state updates BEFORE view change
+  // Symptom submission logic - CRITICAL FIX: Proper state sequencing
   const handleAnalyzeSymptoms = async (text: string, patientAge: number, patientGender: string) => {
     if (!text.trim()) return;
 
     try {
       setIsLoading(true);
+      // FIX: Reset result ready flag before new analysis
+      setIsResultReady(false);
       
       const res = await fetch('/api/predict', {
         method: 'POST',
@@ -159,31 +174,32 @@ export default function App() {
         return;
       }
 
-      // IMPORTANT: Update all state values BEFORE changing view
+      // FIX: Update all state values together
+      // React 18+ batches these updates together
       setDetectedSymptoms(data.symptoms);
       setOriginalText(text);
       setPredictions(data.predictions);
       setAge(patientAge);
       setGender(patientGender);
-
-      // NOW switch to result view with setTimeout to ensure state is flushed
-      setTimeout(() => {
-        setActiveView('result');
-        showAlert('success', 'Analysis complete! View your results below.');
-      }, 0);
+      
+      // FIX: This flag will trigger useEffect which safely transitions to result view
+      // This ensures all state updates are complete before we change the view
+      setIsResultReady(true);
 
       // Fetch updated history if user is logged in (non-blocking)
       if (user) {
         fetchUserHistory().catch(err => console.error('History fetch error:', err));
       }
     } catch (err: any) {
+      // FIX: Reset ready flag on error
+      setIsResultReady(false);
       showAlert('resError', err.message || 'Analysis failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Reset to input view
+  // Reset to input view - FIX: Also reset the ready flag
   const handleResetToInput = () => {
     setActiveView('input');
     setPredictions([]);
@@ -191,6 +207,8 @@ export default function App() {
     setOriginalText('');
     setAge(undefined);
     setGender(undefined);
+    // FIX: Reset result ready flag
+    setIsResultReady(false);
   };
 
   return (
@@ -455,7 +473,8 @@ export default function App() {
               </div>
             </div>
           </div>
-        ) : activeView === 'result' && predictions.length > 0 ? (
+        ) : activeView === 'result' && isResultReady && predictions.length > 0 && detectedSymptoms.length > 0 ? (
+          // FIX: Added comprehensive validation - check isResultReady flag AND all required data exists
           <div className="max-w-6xl mx-auto">
             <PredictionResult
               originalText={originalText}
